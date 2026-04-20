@@ -260,7 +260,7 @@
 
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js';
-    import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/12.12.0/firebase-database.js';
+    import { getDatabase, ref, set, get, onValue } from 'https://www.gstatic.com/firebasejs/12.12.0/firebase-database.js';
 
     const firebaseConfig = {
       apiKey:            'AIzaSyCW2_2Ze70vZAzrfIupUvZeYjBxlqqAFwU',
@@ -346,7 +346,7 @@
       }
     }
 
-    function toggleStorageMode() {
+    async function toggleStorageMode() {
       if (storageMode === 'firebase') {
         const ok = confirm(
           'ローカル保存に切り替えます。\n' +
@@ -357,19 +357,22 @@
         disableFirebaseListener();
         storageMode = 'local';
         localStorage.setItem(MODE_KEY, 'local');
+        updateModeUI();
       } else {
+        const snapshot = await get(DB_REF);
+        const hasData  = snapshot.val() !== null;
         const ok = confirm(
-          'Firebaseに切り替えます。\n' +
-          '現在のローカルデータをFirebaseにアップロードし、クラウドと同期します。\n' +
-          '続けますか？'
+          hasData
+            ? 'Firebaseにデータが存在します。\nFirebaseのデータを優先して同期します（ローカルのデータは上書きされます）。\n続けますか？'
+            : 'Firebaseにデータがありません。\n現在のローカルデータをFirebaseにアップロードして同期します。\n続けますか？'
         );
         if (!ok) return;
         storageMode = 'firebase';
         localStorage.setItem(MODE_KEY, 'firebase');
-        set(DB_REF, { items, categories });
+        if (!hasData) set(DB_REF, { items, categories });
         enableFirebaseListener();
+        updateModeUI();
       }
-      updateModeUI();
     }
 
     // ─── Date helpers ────────────────────────────────────────
