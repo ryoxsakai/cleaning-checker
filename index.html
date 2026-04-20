@@ -7,6 +7,10 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>掃除チェッカー</title>
+  <link rel="apple-touch-icon" href="icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="掃除チェッカー">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
@@ -56,6 +60,9 @@
     .delete-btn { opacity: 0; transition: opacity 0.2s; }
     .item-row:hover .delete-btn { opacity: 1; }
 
+    #mode-thumb   { transition: transform 0.2s ease; }
+    #mode-toggle  { transition: background-color 0.2s ease; }
+
     @media (max-width: 640px) {
       .delete-btn { opacity: 1; }
     }
@@ -70,6 +77,17 @@
       <div>
         <h1 class="text-lg font-bold text-teal-700 leading-tight">掃除チェッカー</h1>
         <p class="text-xs text-teal-400">清潔な空間を保ちましょう</p>
+      </div>
+      <div class="ml-auto flex items-center gap-2">
+        <span class="text-xs text-gray-400">ローカル</span>
+        <button id="mode-toggle" onclick="toggleStorageMode()" title="保存先を切り替え"
+          class="relative w-10 h-5 rounded-full focus:outline-none"
+          style="background:#d1d5db">
+          <span id="mode-thumb"
+            class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow"
+            style="transform:translateX(0)"></span>
+        </button>
+        <span class="text-xs text-gray-400">Firebase</span>
       </div>
     </div>
   </header>
@@ -278,29 +296,78 @@
       localStorage.setItem(CATS_KEY,  JSON.stringify(categories));
     }
 
+    const MODE_KEY   = 'cleaning-checker-mode';
+    let storageMode  = localStorage.getItem(MODE_KEY) || 'local';
+    let fbUnsub      = null;
+
     function saveData() {
-      set(DB_REF, { items, categories });
       saveLocal();
+      if (storageMode === 'firebase') set(DB_REF, { items, categories });
     }
 
-    // ─── Firebase real-time listener ──────────────────────────
-    onValue(DB_REF, snapshot => {
-      const data = snapshot.val();
-      if (data !== null) {
-        items      = data.items      || [];
-        categories = data.categories || ['キッチン', 'バスルーム', 'リビング', 'トイレ', 'その他'];
-        saveLocal();
-        renderCategorySelect();
-        renderList();
-        const modal = document.getElementById('category-manage-modal');
-        if (!modal.classList.contains('hidden') && editingCatIndex === -1) {
-          renderCategoryList();
+    // ─── Firebase listener ────────────────────────────────────
+    function enableFirebaseListener() {
+      if (fbUnsub) return;
+      fbUnsub = onValue(DB_REF, snapshot => {
+        if (storageMode !== 'firebase') return;
+        const data = snapshot.val();
+        if (data !== null) {
+          items      = data.items      || [];
+          categories = data.categories || ['キッチン', 'バスルーム', 'リビング', 'トイレ', 'その他'];
+          saveLocal();
+          renderCategorySelect();
+          renderList();
+          const modal = document.getElementById('category-manage-modal');
+          if (!modal.classList.contains('hidden') && editingCatIndex === -1) {
+            renderCategoryList();
+          }
+        } else {
+          set(DB_REF, { items, categories });
         }
+      });
+    }
+
+    function disableFirebaseListener() {
+      if (fbUnsub) { fbUnsub(); fbUnsub = null; }
+    }
+
+    function updateModeUI() {
+      const toggle = document.getElementById('mode-toggle');
+      const thumb  = document.getElementById('mode-thumb');
+      if (storageMode === 'firebase') {
+        toggle.style.background    = '#0d9488';
+        thumb.style.transform      = 'translateX(20px)';
       } else {
-        // 初回：ローカルのデータを Firebase に書き込む
-        set(DB_REF, { items, categories });
+        toggle.style.background    = '#d1d5db';
+        thumb.style.transform      = 'translateX(0)';
       }
-    });
+    }
+
+    function toggleStorageMode() {
+      if (storageMode === 'firebase') {
+        const ok = confirm(
+          'ローカル保存に切り替えます。\n' +
+          'Firebaseとの同期を停止し、このデバイスにのみ保存されます。\n' +
+          '続けますか？'
+        );
+        if (!ok) return;
+        disableFirebaseListener();
+        storageMode = 'local';
+        localStorage.setItem(MODE_KEY, 'local');
+      } else {
+        const ok = confirm(
+          'Firebaseに切り替えます。\n' +
+          '現在のローカルデータをFirebaseにアップロードし、クラウドと同期します。\n' +
+          '続けますか？'
+        );
+        if (!ok) return;
+        storageMode = 'firebase';
+        localStorage.setItem(MODE_KEY, 'firebase');
+        set(DB_REF, { items, categories });
+        enableFirebaseListener();
+      }
+      updateModeUI();
+    }
 
     // ─── Date helpers ────────────────────────────────────────
     function todayStr() {
@@ -659,12 +726,15 @@
       renderCategoryList, startEditCategory, cancelEditCategory,
       saveEditCategory, deleteCategory, addCategory,
       completeItem, deleteItem, completeAll, toggleSort,
+      toggleStorageMode,
     });
 
     // ─── Init ────────────────────────────────────────────────
-    loadLocal();          // ローカルキャッシュを即時表示
+    loadLocal();
     renderCategorySelect();
     renderList();
+    updateModeUI();
+    if (storageMode === 'firebase') enableFirebaseListener();
   </script>
 </body>
 </html>
