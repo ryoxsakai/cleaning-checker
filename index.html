@@ -470,6 +470,7 @@
     let editingFreqId   = null;
     let editingPlaceId  = null;
     let editingRowCatId = null;
+    let editingDateId   = null;
 
     function openCategoryManageModal() {
       editingCatIndex = -1;
@@ -606,6 +607,37 @@
       document.getElementById('input-category').value = name;
       inp.value = '';
       inp.focus();
+    }
+
+    // ─── Last cleaned date inline edit ───────────────────────
+    function startEditDate(id) {
+      editingDateId = id; editingPlaceId = null; editingRowCatId = null; editingFreqId = null;
+      renderList();
+    }
+    function cancelEditDate() { editingDateId = null; renderList(); }
+    function saveEditDate(id) {
+      const y = document.getElementById('edit-date-year')?.value;
+      const m = document.getElementById('edit-date-month')?.value;
+      const d = document.getElementById('edit-date-day')?.value;
+      if (!y || !m || !d) return;
+      const item = items.find(i => i.id === id);
+      if (item) {
+        item.lastCleaned = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        saveData();
+      }
+      editingDateId = null; renderList();
+    }
+    function updateDayOptions() {
+      const yearSel  = document.getElementById('edit-date-year');
+      const monthSel = document.getElementById('edit-date-month');
+      const daySel   = document.getElementById('edit-date-day');
+      if (!yearSel || !monthSel || !daySel) return;
+      const curDay  = parseInt(daySel.value);
+      const maxDays = new Date(parseInt(yearSel.value), parseInt(monthSel.value), 0).getDate();
+      const newDay  = Math.min(curDay, maxDays);
+      daySel.innerHTML = Array.from({ length: maxDays }, (_, i) =>
+        `<option value="${i+1}" ${i+1 === newDay ? 'selected' : ''}>${i+1}</option>`
+      ).join('');
     }
 
     // ─── Place inline edit ───────────────────────────────────
@@ -813,7 +845,41 @@
   ${placeCell}
   ${catCell}
   ${freqCell}
-  <td class="px-5 py-3.5 text-gray-500 whitespace-nowrap">${formatDate(item.lastCleaned)}</td>
+  ${(() => {
+    if (item.id === editingDateId) {
+      const d   = parseLocal(item.lastCleaned);
+      const cy  = d.getFullYear(), cm = d.getMonth()+1, cd = d.getDate();
+      const now = new Date().getFullYear();
+      const years = Array.from({ length: now - 2019 }, (_, i) => 2020 + i);
+      const maxD  = new Date(cy, cm, 0).getDate();
+      return `<td class="px-5 py-2 whitespace-nowrap">
+        <div class="flex items-center gap-1 flex-wrap">
+          <select id="edit-date-year" onchange="updateDayOptions()"
+            class="border border-teal-300 rounded-lg px-1 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400">
+            ${years.map(y => `<option value="${y}" ${y===cy?'selected':''}>${y}</option>`).join('')}
+          </select><span class="text-gray-400 text-xs">年</span>
+          <select id="edit-date-month" onchange="updateDayOptions()"
+            class="border border-teal-300 rounded-lg px-1 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400">
+            ${Array.from({length:12},(_,i)=>i+1).map(m=>`<option value="${m}" ${m===cm?'selected':''}>${m}</option>`).join('')}
+          </select><span class="text-gray-400 text-xs">月</span>
+          <select id="edit-date-day"
+            class="border border-teal-300 rounded-lg px-1 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400">
+            ${Array.from({length:maxD},(_,i)=>i+1).map(dd=>`<option value="${dd}" ${dd===cd?'selected':''}>${dd}</option>`).join('')}
+          </select><span class="text-gray-400 text-xs">日</span>
+          <button onclick="saveEditDate('${esc(item.id)}')" class="icon-btn text-teal-500 hover:bg-teal-50" title="保存">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+          </button>
+          <button onclick="cancelEditDate()" class="icon-btn text-gray-300 hover:bg-gray-100" title="キャンセル">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </td>`;
+    }
+    return `<td class="px-5 py-3.5 text-gray-500 whitespace-nowrap cursor-pointer hover:text-teal-600 hover:bg-teal-50/50 transition-colors"
+      onclick="startEditDate('${esc(item.id)}')" title="タップして編集">
+      <span class="inline-flex items-center gap-1">${formatDate(item.lastCleaned)} ${pencil}</span>
+    </td>`;
+  })()}
   <td class="px-5 py-3.5" style="min-width:200px">
     <div class="space-y-1.5">
       <div class="flex justify-between items-center gap-2">
@@ -867,6 +933,7 @@
       startEditFreq, cancelEditFreq, changeEditFreq, saveEditFreq,
       startEditPlace, cancelEditPlace, saveEditPlace,
       startEditRowCat, cancelEditRowCat, saveEditRowCat,
+      startEditDate, cancelEditDate, saveEditDate, updateDayOptions,
     });
 
     // ─── Init ────────────────────────────────────────────────
