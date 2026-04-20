@@ -463,6 +463,7 @@
 
     // ─── Category manage modal ───────────────────────────────
     let editingCatIndex = -1;
+    let editingFreqId   = null;
 
     function openCategoryManageModal() {
       editingCatIndex = -1;
@@ -601,6 +602,35 @@
       inp.focus();
     }
 
+    // ─── Frequency inline edit ───────────────────────────────
+    function startEditFreq(id) {
+      editingFreqId = id;
+      renderList();
+      setTimeout(() => {
+        const inp = document.getElementById('edit-freq-input');
+        if (inp) { inp.focus(); inp.select(); }
+      }, 30);
+    }
+
+    function cancelEditFreq() {
+      editingFreqId = null;
+      renderList();
+    }
+
+    function changeEditFreq(delta) {
+      const inp = document.getElementById('edit-freq-input');
+      if (inp) inp.value = Math.max(1, (parseInt(inp.value) || 1) + delta);
+    }
+
+    function saveEditFreq(id) {
+      const inp  = document.getElementById('edit-freq-input');
+      const freq = Math.max(1, parseInt(inp ? inp.value : 1) || 1);
+      const item = items.find(i => i.id === id);
+      if (item) { item.frequency = freq; saveData(); }
+      editingFreqId = null;
+      renderList();
+    }
+
     // ─── Item actions ────────────────────────────────────────
     function completeItem(id) {
       const item = items.find(i => i.id === id);
@@ -670,6 +700,27 @@
             ? `<span class="text-orange-500 text-xs font-semibold">今日まで</span>`
             : `<span class="text-gray-400 text-xs">あと${days}日</span>`;
 
+        const freqCell = item.id === editingFreqId
+          ? `<td class="px-5 py-2 whitespace-nowrap">
+               <div class="flex items-center gap-1">
+                 <button onclick="changeEditFreq(-1)" class="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600 font-bold select-none">−</button>
+                 <input id="edit-freq-input" type="number" value="${item.frequency}" min="1" max="365"
+                   class="w-14 border border-teal-300 rounded-lg px-1 py-1 text-center focus:outline-none focus:ring-2 focus:ring-teal-400"
+                   onkeydown="if(event.key==='Enter') saveEditFreq('${esc(item.id)}'); else if(event.key==='Escape') cancelEditFreq()"/>
+                 <button onclick="changeEditFreq(1)" class="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600 font-bold select-none">＋</button>
+                 <button onclick="saveEditFreq('${esc(item.id)}')" class="icon-btn text-teal-500 hover:bg-teal-50" title="保存">
+                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                 </button>
+                 <button onclick="cancelEditFreq()" class="icon-btn text-gray-300 hover:bg-gray-100" title="キャンセル">
+                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                 </button>
+               </div>
+             </td>`
+          : `<td class="px-5 py-3.5 text-gray-500 whitespace-nowrap cursor-pointer hover:text-teal-600 hover:bg-teal-50/50 rounded transition-colors"
+               onclick="startEditFreq('${esc(item.id)}')" title="タップして編集">
+               ${item.frequency}日ごと
+             </td>`;
+
         return `
 <tr class="item-row border-b border-gray-50 ${isOver ? 'bg-red-50/40' : ''}">
   <td class="px-5 py-3.5 font-medium text-gray-700 whitespace-nowrap">${esc(item.place)}</td>
@@ -678,7 +729,7 @@
       ${esc(item.category)}
     </span>
   </td>
-  <td class="px-5 py-3.5 text-gray-500 whitespace-nowrap">${item.frequency}日ごと</td>
+  ${freqCell}
   <td class="px-5 py-3.5 text-gray-500 whitespace-nowrap">${formatDate(item.lastCleaned)}</td>
   <td class="px-5 py-3.5" style="min-width:200px">
     <div class="space-y-1.5">
@@ -730,6 +781,7 @@
       saveEditCategory, deleteCategory, addCategory,
       completeItem, deleteItem, completeAll, toggleSort,
       toggleStorageMode,
+      startEditFreq, cancelEditFreq, changeEditFreq, saveEditFreq,
     });
 
     // ─── Init ────────────────────────────────────────────────
