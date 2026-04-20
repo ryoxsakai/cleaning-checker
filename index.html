@@ -237,7 +237,23 @@
     </div>
   </div>
 
-  <script>
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js';
+    import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/12.12.0/firebase-database.js';
+
+    const firebaseConfig = {
+      apiKey:            'AIzaSyCW2_2Ze70vZAzrfIupUvZeYjBxlqqAFwU',
+      authDomain:        'cleaning-checker-cefc6.firebaseapp.com',
+      databaseURL:       'https://cleaning-checker-cefc6-default-rtdb.asia-southeast1.firebasedatabase.app',
+      projectId:         'cleaning-checker-cefc6',
+      storageBucket:     'cleaning-checker-cefc6.firebasestorage.app',
+      messagingSenderId: '1097101786192',
+      appId:             '1:1097101786192:web:7fb9568e22d9588b036555',
+    };
+    const fbApp  = initializeApp(firebaseConfig);
+    const db     = getDatabase(fbApp);
+    const DB_REF = ref(db, 'cleaning-checker');
+
     // ─── State ───────────────────────────────────────────────
     let items      = [];
     let categories = ['キッチン', 'バスルーム', 'リビング', 'トイレ', 'その他'];
@@ -248,19 +264,43 @@
     const CATS_KEY  = 'cleaning-checker-categories';
 
     // ─── Persistence ─────────────────────────────────────────
-    function loadData() {
+    function loadLocal() {
       try {
         const si = localStorage.getItem(ITEMS_KEY);
         const sc = localStorage.getItem(CATS_KEY);
         if (si) items      = JSON.parse(si);
         if (sc) categories = JSON.parse(sc);
-      } catch (e) { console.warn('load error', e); }
+      } catch(e) {}
     }
 
-    function saveData() {
+    function saveLocal() {
       localStorage.setItem(ITEMS_KEY, JSON.stringify(items));
       localStorage.setItem(CATS_KEY,  JSON.stringify(categories));
     }
+
+    function saveData() {
+      set(DB_REF, { items, categories });
+      saveLocal();
+    }
+
+    // ─── Firebase real-time listener ──────────────────────────
+    onValue(DB_REF, snapshot => {
+      const data = snapshot.val();
+      if (data !== null) {
+        items      = data.items      || [];
+        categories = data.categories || ['キッチン', 'バスルーム', 'リビング', 'トイレ', 'その他'];
+        saveLocal();
+        renderCategorySelect();
+        renderList();
+        const modal = document.getElementById('category-manage-modal');
+        if (!modal.classList.contains('hidden') && editingCatIndex === -1) {
+          renderCategoryList();
+        }
+      } else {
+        // 初回：ローカルのデータを Firebase に書き込む
+        set(DB_REF, { items, categories });
+      }
+    });
 
     // ─── Date helpers ────────────────────────────────────────
     function todayStr() {
@@ -612,8 +652,17 @@
         .replace(/'/g, '&#39;');
     }
 
+    // ─── Expose to global scope (inline onclick handlers) ────
+    Object.assign(window, {
+      toggleForm, changeFreq, addItem,
+      openCategoryManageModal, closeCategoryManageModal,
+      renderCategoryList, startEditCategory, cancelEditCategory,
+      saveEditCategory, deleteCategory, addCategory,
+      completeItem, deleteItem, completeAll, toggleSort,
+    });
+
     // ─── Init ────────────────────────────────────────────────
-    loadData();
+    loadLocal();          // ローカルキャッシュを即時表示
     renderCategorySelect();
     renderList();
   </script>
