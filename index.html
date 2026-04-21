@@ -69,6 +69,16 @@
     @media (max-width: 640px) {
       .delete-btn { opacity: 1; }
     }
+
+    #toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+      background: #0f766e; color: #fff; padding: 10px 20px; border-radius: 999px;
+      font-size: 14px; font-weight: 600; z-index: 9999; white-space: nowrap;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+      transition: transform 0.25s ease, opacity 0.25s ease; opacity: 0; pointer-events: none;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    #toast.error { background: #dc2626; }
   </style>
 </head>
 <body class="min-h-screen" style="background: linear-gradient(135deg,#f0fdf9 0%,#ecfeff 50%,#f0f9ff 100%)">
@@ -304,12 +314,20 @@
     let storageMode  = localStorage.getItem(MODE_KEY) || 'local';
     let fbUnsub      = null;
 
-    let _ownWritePending = false;
+    let _ownWriteUntil = 0;
+
+    function showToast(msg, isError = false) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'show' + (isError ? ' error' : '');
+      clearTimeout(t._t);
+      t._t = setTimeout(() => { t.className = ''; }, 2500);
+    }
 
     function saveData() {
       saveLocal();
       if (storageMode === 'firebase') {
-        _ownWritePending = true;
+        _ownWriteUntil = Date.now() + 3000;
         set(DB_REF, { items, categories });
       }
     }
@@ -319,8 +337,8 @@
       if (fbUnsub) return;
       fbUnsub = onValue(DB_REF, snapshot => {
         if (storageMode !== 'firebase') return;
-        // Skip the immediate echo of our own writes — items is already up-to-date
-        if (_ownWritePending) { _ownWritePending = false; return; }
+        // Skip Firebase echoes of our own writes — items is already up-to-date locally
+        if (Date.now() < _ownWriteUntil) return;
         const data = snapshot.val();
         if (data !== null) {
           const rawItems = data.items;
@@ -712,8 +730,19 @@
 
     // ─── Item actions ────────────────────────────────────────
     function completeItem(id) {
-      const item = items.find(i => String(i.id) === String(id));
-      if (item) { item.lastCleaned = todayStr(); saveData(); renderList(); }
+      try {
+        const item = items.find(i => String(i.id) === String(id));
+        if (!item) {
+          showToast('エラー: アイテムが見つかりません', true);
+          return;
+        }
+        item.lastCleaned = todayStr();
+        saveData();
+        renderList();
+        showToast(`✓ ${item.place} の掃除を完了しました`);
+      } catch(e) {
+        showToast('エラー: ' + e.message, true);
+      }
     }
 
     function deleteItem(id) {
@@ -954,5 +983,7 @@
     updateModeUI();
     if (storageMode === 'firebase') enableFirebaseListener();
   </script>
+
+  <div id="toast"></div>
 </body>
 </html>
