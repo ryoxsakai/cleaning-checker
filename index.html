@@ -892,13 +892,14 @@
       </div>
     </div>
   </td>
-  <td class="px-5 py-3.5 whitespace-nowrap">
-    <div class="flex items-center gap-1">
-      <button class="icon-btn text-green-500 hover:bg-green-50"
+  <td class="px-4 py-3 whitespace-nowrap">
+    <div class="flex items-center gap-2">
+      <button class="flex items-center gap-1 px-3 py-1.5 bg-green-50 hover:bg-green-100 active:bg-green-200 text-green-700 rounded-lg text-xs font-semibold border border-green-200 transition-colors"
         onclick="completeItem('${esc(item.id)}')" title="掃除完了">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
         </svg>
+        完了
       </button>
       <button class="icon-btn delete-btn text-gray-300 hover:text-red-400 hover:bg-red-50"
         onclick="deleteItem('${esc(item.id)}')" title="削除">
