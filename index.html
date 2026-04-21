@@ -304,9 +304,14 @@
     let storageMode  = localStorage.getItem(MODE_KEY) || 'local';
     let fbUnsub      = null;
 
+    let _ownWritePending = false;
+
     function saveData() {
       saveLocal();
-      if (storageMode === 'firebase') set(DB_REF, { items, categories });
+      if (storageMode === 'firebase') {
+        _ownWritePending = true;
+        set(DB_REF, { items, categories });
+      }
     }
 
     // ─── Firebase listener ────────────────────────────────────
@@ -314,6 +319,8 @@
       if (fbUnsub) return;
       fbUnsub = onValue(DB_REF, snapshot => {
         if (storageMode !== 'firebase') return;
+        // Skip the immediate echo of our own writes — items is already up-to-date
+        if (_ownWritePending) { _ownWritePending = false; return; }
         const data = snapshot.val();
         if (data !== null) {
           const rawItems = data.items;
@@ -705,13 +712,13 @@
 
     // ─── Item actions ────────────────────────────────────────
     function completeItem(id) {
-      const item = items.find(i => i.id === id);
+      const item = items.find(i => String(i.id) === String(id));
       if (item) { item.lastCleaned = todayStr(); saveData(); renderList(); }
     }
 
     function deleteItem(id) {
       if (!confirm('この掃除場所を削除しますか？')) return;
-      items = items.filter(i => i.id !== id);
+      items = items.filter(i => String(i.id) !== String(id));
       saveData();
       renderList();
     }
