@@ -316,8 +316,11 @@
         if (storageMode !== 'firebase') return;
         const data = snapshot.val();
         if (data !== null) {
-          items      = data.items      || [];
-          categories = data.categories || ['キッチン', 'バスルーム', 'リビング', 'トイレ', 'その他'];
+          const rawItems = data.items;
+          items = Array.isArray(rawItems) ? rawItems : Object.values(rawItems || {});
+          const rawCats = data.categories;
+          const catVals = Array.isArray(rawCats) ? rawCats : Object.values(rawCats || {});
+          categories = catVals.length > 0 ? catVals : ['キッチン', 'バスルーム', 'リビング', 'トイレ', 'その他'];
           saveLocal();
           renderCategorySelect();
           renderList();
