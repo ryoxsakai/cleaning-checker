@@ -91,16 +91,25 @@
         <h1 class="text-lg font-bold text-teal-700 leading-tight">掃除チェッカー</h1>
         <p class="text-xs text-teal-400">清潔な空間を保ちましょう</p>
       </div>
-      <div class="ml-auto flex items-center gap-2">
-        <span class="text-xs text-gray-400">ローカル</span>
-        <button id="mode-toggle" onclick="toggleStorageMode()" title="保存先を切り替え"
-          class="relative w-10 h-5 rounded-full focus:outline-none"
-          style="background:#d1d5db">
-          <span id="mode-thumb"
-            class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow"
-            style="transform:translateX(0)"></span>
+      <div class="ml-auto flex items-center gap-3">
+        <button id="notif-btn" onclick="setupNotifications()" title="通知をオンにする"
+          class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-teal-50 transition-colors focus:outline-none">
+          <svg id="notif-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+          </svg>
         </button>
-        <span class="text-xs text-gray-400">Firebase</span>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-gray-400">ローカル</span>
+          <button id="mode-toggle" onclick="toggleStorageMode()" title="保存先を切り替え"
+            class="relative w-10 h-5 rounded-full focus:outline-none"
+            style="background:#d1d5db">
+            <span id="mode-thumb"
+              class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow"
+              style="transform:translateX(0)"></span>
+          </button>
+          <span class="text-xs text-gray-400">Firebase</span>
+        </div>
       </div>
     </div>
   </header>
@@ -322,6 +331,71 @@
       t.className = 'show' + (isError ? ' error' : '');
       clearTimeout(t._t);
       t._t = setTimeout(() => { t.className = ''; }, 2500);
+    }
+
+    // ─── Notifications ───────────────────────────────────────
+    const NOTIF_DATE_KEY = 'cleaning-checker-last-notif';
+
+    function updateNotifUI() {
+      const btn  = document.getElementById('notif-btn');
+      const icon = document.getElementById('notif-icon');
+      if (!btn) return;
+      const granted = ('Notification' in window) && Notification.permission === 'granted';
+      btn.title = granted ? '通知ON — タップで今すぐ確認' : '通知をオンにする';
+      icon.style.color = granted ? '#0d9488' : '#9ca3af';
+    }
+
+    function sendDueNotifications(force = false) {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return;
+      const today = todayStr();
+      if (!force && localStorage.getItem(NOTIF_DATE_KEY) === today) return;
+
+      const overdue  = items.filter(i => daysLeft(i.lastCleaned, i.frequency) < 0);
+      const dueToday = items.filter(i => daysLeft(i.lastCleaned, i.frequency) === 0);
+
+      if (overdue.length === 0 && dueToday.length === 0) {
+        if (force) showToast('期限が来ている掃除場所はありません ✓');
+        return;
+      }
+
+      localStorage.setItem(NOTIF_DATE_KEY, today);
+
+      if (overdue.length > 0) {
+        new Notification('掃除チェッカー', {
+          body: `期限超過: ${overdue.map(i => i.place).join('、')}`,
+          icon: 'logo.png',
+          badge: 'logo.png',
+        });
+      }
+      if (dueToday.length > 0) {
+        new Notification('掃除チェッカー', {
+          body: `今日が期限: ${dueToday.map(i => i.place).join('、')}`,
+          icon: 'logo.png',
+          badge: 'logo.png',
+        });
+      }
+    }
+
+    async function setupNotifications() {
+      if (!('Notification' in window)) {
+        showToast('このブラウザは通知未対応です（iOS 16.4以降のホーム画面アプリが必要）', true);
+        return;
+      }
+      if (Notification.permission === 'granted') {
+        sendDueNotifications(true);
+        return;
+      }
+      if (Notification.permission === 'denied') {
+        showToast('通知がブロックされています。設定 → Safari → 通知 から許可してください', true);
+        return;
+      }
+      const perm = await Notification.requestPermission();
+      updateNotifUI();
+      if (perm === 'granted') {
+        sendDueNotifications(true);
+      } else {
+        showToast('通知の許可が必要です', true);
+      }
     }
 
     function saveData() {
@@ -969,7 +1043,7 @@
       renderCategoryList, startEditCategory, cancelEditCategory,
       saveEditCategory, deleteCategory, addCategory,
       completeItem, deleteItem, completeAll, toggleSort,
-      toggleStorageMode,
+      toggleStorageMode, setupNotifications,
       startEditFreq, cancelEditFreq, changeEditFreq, saveEditFreq,
       startEditPlace, cancelEditPlace, saveEditPlace,
       startEditRowCat, cancelEditRowCat, saveEditRowCat,
@@ -981,7 +1055,10 @@
     renderCategorySelect();
     renderList();
     updateModeUI();
+    updateNotifUI();
     if (storageMode === 'firebase') enableFirebaseListener();
+    // 1日1回、アプリを開いたときに期限チェック通知
+    setTimeout(() => sendDueNotifications(), 1000);
   </script>
 
   <div id="toast"></div>
